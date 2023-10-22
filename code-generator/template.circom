@@ -50,7 +50,7 @@ template PrologResolutionTree(depth, branchFactor) {
         nodes[i] = TreeNode(branchFactor);
     }
     
-    
+    assert(goals[0] != 0);
 
     for(var i = 0; i < totalNodes; i++){
          nodes[i].goal <-- goals[i];

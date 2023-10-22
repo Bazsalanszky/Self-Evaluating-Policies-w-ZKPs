@@ -1,12 +1,16 @@
 package hu.bme.app
 
 object Parser {
-    val SPECIAL_TERMS = listOf(" is ", ">", "<", ">=", "=<",  "\\=", "==","+","-","*","/","\\")
+    val SPECIAL_TERMS = listOf(" is ", ">", "<", ">=", "=<", "\\=", "==", "+", "-", "*", "/", "\\", " div ")
+    val SPECIAL_MAPPING = mapOf(" div " to "/")
+
     fun parseProlog(prologCode: String): List<Clause> {
         val clauses = mutableListOf<Clause>()
 
         val mergedLines = preprocessPrologCode(prologCode)
-        for (line in mergedLines) {
+
+
+        mergedLines.forEach { line ->
             clauses.add(parseClause(line))
         }
 
@@ -15,7 +19,7 @@ object Parser {
 
 
     fun preprocessPrologCode(prologCode: String): List<String> {
-        val lines = prologCode.lines()
+        val lines = prologCode.lines().filter { !it.startsWith("%") }.map { it.split("%")[0] }
         val mergedLines = mutableListOf<String>()
         var currentLine = StringBuilder()
 
@@ -78,16 +82,57 @@ object Parser {
         // Handle arithmetics
         if (SPECIAL_TERMS.any { predStr.contains(it) }) {
             val predicate = parseSpecialPredicate(name)
-            return if(predicate is Predicate) predicate as Predicate else error("$predStr is not a predicate")
+            return if (predicate is Predicate) predicate as Predicate else error("$predStr is not a predicate")
         }
-        val termsStr = if (predStr.contains("(")) predStr.substringAfter("(").trimEnd(')', '.',',').trim() else ""
-        val terms = if (termsStr.isNotEmpty()) {
-            termsStr.split(",").map { parseTerm(it.trim()) }
+        val termsStr = if (predStr.contains("(")) predStr.substringAfter("(").trimEnd(')', '.', ',').trim() else ""
+        val terms = parseTerms(termsStr)
+
+        return Predicate(name, terms)
+    }
+
+    fun parseTerms(termStr: String): List<Term> {
+        val terms = if (termStr.isNotEmpty()) {
+            if (termStr.startsWith("[")) {
+                //listOf(parseListTerm(termStr))
+                val listStr = termStr.substring(1, termStr.indexOfFirst { it == ']' })
+                mutableListOf<Term>(parseListTerm(listStr)).also {
+                    var theRest = termStr.substring(termStr.indexOfFirst { it == ']' } + 1).trim()
+                    if (theRest.startsWith(",")) theRest = theRest.substring(1).trim()
+                    if (theRest.isNotEmpty())
+                        it.addAll(parseTerms(theRest))
+                }
+
+            } else {
+                termStr.split(",").map { parseTerm(it.trim()) }
+            }
         } else {
             emptyList()
         }
+        return terms
+    }
 
-        return Predicate(name, terms)
+    fun parseListTerm(termStr: String): Predicate {
+        val resultTermBody = mutableListOf<Term>()
+        val parts = termStr.split(",")
+        var currentTermStr = parts[0].trim().replace("]", "").replace("[", "").trim()
+        if (currentTermStr.isEmpty()) return Predicate(".", emptyList())
+        val currentTerm = if (currentTermStr.contains("|").not()) {
+            parseTerm(currentTermStr)
+        } else {
+            currentTermStr.split("|").map { parseTerm(it.trim()) }.let { Predicate(".", it) }
+        }
+
+        val body = mutableListOf<Term>().also { it.add(currentTerm) }
+        if (parts.size > 1) {
+            body.add(
+                parseListTerm(termStr.substring(currentTermStr.length + 1).trim())
+            )
+            return Predicate(".", body)
+        }
+        if (currentTerm is Predicate && currentTerm.name == ".") {
+            return currentTerm
+        }
+        return Predicate(".", body)
     }
 
     // Parse arithmetics
@@ -96,13 +141,15 @@ object Parser {
         if (predStr.isEmpty()) return Predicate("", emptyList())
         // Find the special term name in the specialTerms list
         val specialTerm = SPECIAL_TERMS.find { predStr.contains(it) } ?: predStr
-        return if(predStr != specialTerm) {
+        return if (predStr != specialTerm) {
             // Split the predicate string into the left and right side of the special term
             val parts = predStr.split(specialTerm)
             val left = parseTerm(parts[0].trim())
             val rightPredicate = parseSpecialPredicate(parts[1].trim())
+            val name =
+                if (SPECIAL_MAPPING.containsKey(specialTerm)) SPECIAL_MAPPING[specialTerm]!! else specialTerm.trim()
             // Return the predicate
-            Predicate(specialTerm, listOf(left, rightPredicate))
+            Predicate(name, listOf(left, rightPredicate))
         } else {
             parseTerm(predStr)
         }

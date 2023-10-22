@@ -47,10 +47,43 @@ class Predicate(name: String, val terms: List<Term>) : Term(name){
     }
 
     override fun toString(): String {
-        return "Predicate(terms=$terms)"
+        return "Predicate(name=$name,terms=$terms)"
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        if (!super.equals(other)) return false
+
+        other as Predicate
+
+        return terms == other.terms
+    }
+
+    override fun hashCode(): Int {
+        var result = super.hashCode()
+        result = 31 * result + terms.hashCode()
+        return result
     }
 
 
 }
 
-data class Clause(val head: Predicate, val body: List<Predicate>)
+data class Clause(val head: Predicate, val body: List<Predicate>) {
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as Clause
+
+        if (head != other.head) return false
+        return body == other.body
+    }
+
+    override fun hashCode(): Int {
+        var result = head.hashCode()
+        result = 31 * result + body.hashCode()
+        return result
+    }
+}

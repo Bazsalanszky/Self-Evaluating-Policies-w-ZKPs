@@ -23,6 +23,16 @@ fun createMapping(clauses: List<Clause>) :Map<String,Int>{
                 if (!mapping.contains(term.name) && term is Atom) {
                     mapping[term.name] = counter++
                 }
+                if (term is Predicate) {
+                    if (!mapping.contains(term.name)) {
+                        mapping[term.name] = counter++
+                    }
+                    term.terms.forEach { subTerm ->
+                        if (!mapping.contains(subTerm.name) && subTerm is Atom) {
+                            mapping[subTerm.name] = counter++
+                        }
+                    }
+                }
             }
         }
     }
